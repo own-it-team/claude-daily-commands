@@ -6,7 +6,15 @@
       "Bash(git init)",
       "Bash(git config user.name \"Test User\")",
       "Bash(git config user.email \"test@example.com\")",
-      "Bash(git add .claude/ PRD.md)"
+      "Bash(git add .claude/ PRD.md)",
+      "Bash(git commit -m \"feat: Add custom Claude Code commands (dailyreview, todo, portfolio)\")",
+      "Bash(git add src/ tests/)",
+      "Bash(git commit -m \"feat: Add basic authentication module\")",
+      "Bash(git log --since=\"today 00:00\" --pretty=format:\"%H|%ai|%s|%an\" --no-merges)",
+      "Bash(git show --stat --format=\"\" c971d25)",
+      "Bash(chmod +x install.sh)",
+      "Bash(tree -L 3 -a -I '.git' .)",
+      "Bash(git add .)"
     ],
     "deny": [],
     "ask": []
