@@ -14,7 +14,17 @@
       "Bash(git show --stat --format=\"\" c971d25)",
       "Bash(chmod +x install.sh)",
       "Bash(tree -L 3 -a -I '.git' .)",
-      "Bash(git add .)"
+      "Bash(git add .)",
+      "Bash(git commit -m \"docs: Add README, examples, and install script\n\n- Add comprehensive README.md with usage guide\n- Add example outputs for dailyreview and todo commands  \n- Add install.sh script for easy installation\n- Add .gitignore for common files\")",
+      "Bash(cat .claude/commands/dailyreview.md)",
+      "Bash(find . -type f -not -path \"./.git/*\" -exec wc -l {} +)",
+      "Bash(tree -L 2 -a -I '.git')",
+      "Bash(cat install.sh)",
+      "Bash(git add LICENSE README.md install.sh)",
+      "Bash(git add .claude/commands/dailyreviewv2.md .claude/commands/todov2.md .claude/commands/portfolio.md)",
+      "Bash(git add V2_CHANGELOG.md V2_TEST_GUIDE.md)",
+      "Bash(git add examples/dailyreview-v2-example.md examples/todo-v2-example.md)",
+      "Bash(git commit -m \"feat: Add v2 optimized commands and GitHub distribution setup\n\n- Add v2 commands (dailyreviewv2, todov2) - 80% shorter, 85% faster\n- Update README with one-click installation\n- Add MIT License\n- Add comprehensive v2 documentation (changelog, test guide, examples)\n- Replace placeholders with github.com/wineny/claude-daily-commands\n- Optimize install.sh for v2 support\")"
     ],
     "deny": [],
     "ask": []

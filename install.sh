@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Own It Custom Commands Installer
-# Installs Claude Code custom commands for daily review and portfolio generation
+# Claude Daily Commands Installer
+# Supports both one-click curl install and git clone install
 
 set -e
 
@@ -12,45 +12,42 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# GitHub repository info
+GITHUB_USER="wineny"
+GITHUB_REPO="claude-daily-commands"
+GITHUB_RAW="https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main"
+
 # Banner
 echo ""
 echo -e "${BLUE}================================${NC}"
-echo -e "${BLUE}  Own It - Custom Commands${NC}"
-echo -e "${BLUE}  Claude Code Installer${NC}"
+echo -e "${BLUE}  Claude Daily Commands${NC}"
+echo -e "${BLUE}  Installer${NC}"
 echo -e "${BLUE}================================${NC}"
 echo ""
 
-# Check if we're in the right directory
-if [ ! -d ".claude/commands" ]; then
-    echo -e "${RED}❌ Error: .claude/commands directory not found${NC}"
-    echo -e "${YELLOW}💡 Please run this script from the owinit-custom-command directory${NC}"
-    exit 1
-fi
-
-# Check if Claude Code is installed (optional check)
-echo -e "${BLUE}🔍 Checking environment...${NC}"
-
-# Detect installation type
-if [ -d ".git" ]; then
-    echo -e "${YELLOW}📦 Detected Git repository - Ready to install${NC}"
+# Detect installation method
+if [ -d ".claude/commands" ]; then
+    # Local installation (git clone method)
+    INSTALL_METHOD="local"
+    echo -e "${BLUE}🔍 Detected local repository${NC}"
+else
+    # Remote installation (curl method)
+    INSTALL_METHOD="remote"
+    echo -e "${BLUE}🌐 Remote installation mode${NC}"
 fi
 
 echo ""
 echo "Installation options:"
 echo "  1) Global (all projects - recommended)"
-echo "  2) Local (current project only)"
-echo "  3) Cancel"
+echo "  2) Cancel"
 echo ""
-read -p "Choose installation type (1/2/3): " choice
+read -p "Choose installation type (1/2): " choice
 
 case $choice in
     1)
         INSTALL_TYPE="global"
         ;;
     2)
-        INSTALL_TYPE="local"
-        ;;
-    3)
         echo -e "${YELLOW}Installation cancelled${NC}"
         exit 0
         ;;
@@ -75,75 +72,74 @@ if [ "$install_v2" = "y" ] || [ "$install_v2" = "Y" ]; then
     INSTALL_V2=true
 fi
 
-# Install based on type
-if [ "$INSTALL_TYPE" = "global" ]; then
-    echo ""
-    echo -e "${BLUE}🌍 Installing globally...${NC}"
+# Install globally
+echo ""
+echo -e "${BLUE}🌍 Installing globally...${NC}"
 
-    # Create global directory
-    mkdir -p ~/.claude/commands
+# Create global directory
+mkdir -p ~/.claude/commands
 
-    # Copy v1 commands
-    echo "Copying v1 command files..."
+# Download or copy files based on installation method
+if [ "$INSTALL_METHOD" = "remote" ]; then
+    # Remote installation - download from GitHub
+    echo "Downloading command files from GitHub..."
+
+    # Download v1 commands
+    curl -fsSL "${GITHUB_RAW}/.claude/commands/dailyreview.md" -o ~/.claude/commands/dailyreview.md
+    echo "  ✓ dailyreview.md"
+
+    curl -fsSL "${GITHUB_RAW}/.claude/commands/todo.md" -o ~/.claude/commands/todo.md
+    echo "  ✓ todo.md"
+
+    curl -fsSL "${GITHUB_RAW}/.claude/commands/portfolio.md" -o ~/.claude/commands/portfolio.md
+    echo "  ✓ portfolio.md"
+
+    # Download v2 commands if requested
+    if [ "$INSTALL_V2" = true ]; then
+        curl -fsSL "${GITHUB_RAW}/.claude/commands/dailyreviewv2.md" -o ~/.claude/commands/dailyreviewv2.md
+        echo "  ✓ dailyreviewv2.md"
+
+        curl -fsSL "${GITHUB_RAW}/.claude/commands/todov2.md" -o ~/.claude/commands/todov2.md
+        echo "  ✓ todov2.md"
+    fi
+else
+    # Local installation - copy from local directory
+    echo "Copying command files from local repository..."
+
     cp -v .claude/commands/dailyreview.md ~/.claude/commands/
     cp -v .claude/commands/todo.md ~/.claude/commands/
     cp -v .claude/commands/portfolio.md ~/.claude/commands/
 
-    # Copy v2 commands if requested
     if [ "$INSTALL_V2" = true ]; then
-        echo "Copying v2 optimized commands..."
         cp -v .claude/commands/dailyreviewv2.md ~/.claude/commands/
         cp -v .claude/commands/todov2.md ~/.claude/commands/
     fi
-
-    echo ""
-    echo -e "${GREEN}✅ Global installation complete!${NC}"
-    echo ""
-    echo -e "Commands installed to: ${BLUE}~/.claude/commands/${NC}"
-    echo ""
-    echo "Available commands (in all projects):"
-    echo ""
-    echo "v1 (detailed output):"
-    echo "  • /dailyreview - Git-based daily work review"
-    echo "  • /todo        - Smart todo recommendations"
-    echo "  • /portfolio   - Portfolio generation (beta)"
-
-    if [ "$INSTALL_V2" = true ]; then
-        echo ""
-        echo "v2 (optimized, faster):"
-        echo "  • /dailyreviewv2 - 80% shorter, 85% fewer approvals"
-        echo "  • /todov2        - 70% shorter, faster execution"
-        echo ""
-        echo -e "${GREEN}💡 Try v2 first for daily use!${NC}"
-    fi
-
-    echo ""
-    echo -e "${YELLOW}⚠️  IMPORTANT: Restart Claude Code completely to see the new commands${NC}"
-    echo -e "${YELLOW}   (Use Cmd+Q or Ctrl+Q to quit, then restart)${NC}"
-
-elif [ "$INSTALL_TYPE" = "local" ]; then
-    echo ""
-    echo -e "${BLUE}📦 Installing locally to current project...${NC}"
-
-    # Commands are already in .claude/commands, just confirm
-    echo ""
-    echo -e "${GREEN}✅ Commands are already available in this project!${NC}"
-    echo ""
-    echo -e "Location: ${BLUE}./.claude/commands/${NC}"
-    echo ""
-    echo "Available commands:"
-    echo "  • /dailyreview - Git-based daily work review"
-    echo "  • /todo        - Smart todo recommendations"
-
-    if [ "$INSTALL_V2" = true ]; then
-        echo "  • /dailyreviewv2 - Optimized version"
-        echo "  • /todov2        - Optimized version"
-    fi
-
-    echo "  • /portfolio   - Portfolio generation (beta)"
-    echo ""
-    echo -e "${YELLOW}💡 Open Claude Code in this project to use the commands${NC}"
 fi
+
+echo ""
+echo -e "${GREEN}✅ Global installation complete!${NC}"
+echo ""
+echo -e "Commands installed to: ${BLUE}~/.claude/commands/${NC}"
+echo ""
+echo "Available commands (in all projects):"
+echo ""
+echo "v1 (detailed output):"
+echo "  • /dailyreview - Git-based daily work review"
+echo "  • /todo        - Smart todo recommendations"
+echo "  • /portfolio   - Portfolio generation (beta)"
+
+if [ "$INSTALL_V2" = true ]; then
+    echo ""
+    echo "v2 (optimized, faster):"
+    echo "  • /dailyreviewv2 - 80% shorter, 85% fewer approvals"
+    echo "  • /todov2        - 70% shorter, faster execution"
+    echo ""
+    echo -e "${GREEN}💡 Try v2 first for daily use!${NC}"
+fi
+
+echo ""
+echo -e "${YELLOW}⚠️  IMPORTANT: Restart Claude Code completely to see the new commands${NC}"
+echo -e "${YELLOW}   (Use Cmd+Q or Ctrl+Q to quit, then restart)${NC}"
 
 # Show next steps
 echo ""
@@ -164,6 +160,6 @@ if [ "$INSTALL_V2" = true ]; then
 fi
 echo -e "${GREEN}Happy coding! 🚀${NC}"
 echo ""
-echo -e "📖 Docs: ${BLUE}https://github.com/wineny/owinit-custom-command${NC}"
-echo -e "🐛 Issues: ${BLUE}https://github.com/wineny/owinit-custom-command/issues${NC}"
+echo -e "📖 Docs: ${BLUE}https://github.com/${GITHUB_USER}/${GITHUB_REPO}${NC}"
+echo -e "🐛 Issues: ${BLUE}https://github.com/${GITHUB_USER}/${GITHUB_REPO}/issues${NC}"
 echo ""
