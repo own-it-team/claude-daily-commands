@@ -143,7 +143,7 @@ Own It 베타 테스터가 되어 포트폴리오 생성의 미래를 함께 만
 **신청 방법**:
 - 이메일: beta@ownit.dev (준비 중)
 - 디스코드: [Own It Community](#) (준비 중)
-- GitHub Issues: [피드백 남기기](https://github.com/YOUR_USERNAME/owinit-custom-command/issues)
+- GitHub Issues: [피드백 남기기](https://github.com/wineny/owinit-custom-command/issues)
 
 ---
 
@@ -197,4 +197,4 @@ A: Git 메타데이터만 분석하며, 실제 코드는 저장하지 않습니�
 
 **Note**: 이 명령어는 현재 미리보기 기능만 제공합니다. 전체 기능은 Own It 플랫폼 출시 시 사용 가능합니다.
 
-💡 **피드백 환영**: 어떤 기능을 원하시나요? [GitHub Issues](https://github.com/YOUR_USERNAME/owinit-custom-command/issues)에서 의견을 나눠주세요!
+💡 **피드백 환영**: 어떤 기능을 원하시나요? [GitHub Issues](https://github.com/wineny/owinit-custom-command/issues)에서 의견을 나눠주세요!
