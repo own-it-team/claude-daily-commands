@@ -24,7 +24,9 @@
       "Bash(git add .claude/commands/dailyreviewv2.md .claude/commands/todov2.md .claude/commands/portfolio.md)",
       "Bash(git add V2_CHANGELOG.md V2_TEST_GUIDE.md)",
       "Bash(git add examples/dailyreview-v2-example.md examples/todo-v2-example.md)",
-      "Bash(git commit -m \"feat: Add v2 optimized commands and GitHub distribution setup\n\n- Add v2 commands (dailyreviewv2, todov2) - 80% shorter, 85% faster\n- Update README with one-click installation\n- Add MIT License\n- Add comprehensive v2 documentation (changelog, test guide, examples)\n- Replace placeholders with github.com/wineny/claude-daily-commands\n- Optimize install.sh for v2 support\")"
+      "Bash(git commit -m \"feat: Add v2 optimized commands and GitHub distribution setup\n\n- Add v2 commands (dailyreviewv2, todov2) - 80% shorter, 85% faster\n- Update README with one-click installation\n- Add MIT License\n- Add comprehensive v2 documentation (changelog, test guide, examples)\n- Replace placeholders with github.com/wineny/claude-daily-commands\n- Optimize install.sh for v2 support\")",
+      "Bash(git add install.sh)",
+      "Bash(git commit -m \"fix: Support one-click curl installation\n\n- Auto-detect installation method (remote curl vs local git clone)\n- Download files from GitHub when using curl method\n- Copy files from local directory when using git clone\n- Simplify installation options (remove local option for curl method)\n- Fix error when .claude/commands directory doesn''t exist\")"
     ],
     "deny": [],
     "ask": []
