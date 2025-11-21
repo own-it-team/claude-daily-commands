@@ -56,7 +56,7 @@ echo "4. Copy the key (starts with 'own_it_sk_')"
 echo ""
 
 # Get API key
-read -p "Enter your API key: " API_KEY
+read -p "Enter your Own It API key: " API_KEY
 
 # Validate API key format
 if [[ ! $API_KEY =~ ^own_it_sk_ ]]; then
@@ -67,11 +67,11 @@ fi
 
 # Get API URL
 echo ""
-read -p "Enter API URL (default: http://localhost:3001): " API_URL
+read -p "Enter API URL (default: http://localhost:4000): " API_URL
 
 # Set default
 if [ -z "$API_URL" ]; then
-  API_URL="http://localhost:3001"
+  API_URL="http://localhost:4000"
 fi
 
 # Validate URL format
@@ -81,23 +81,46 @@ if [[ ! $API_URL =~ ^https?:// ]]; then
   exit 1
 fi
 
+# Get Claude API key (optional)
+echo ""
+echo -e "${BLUE}🤖 Claude AI Integration (Optional)${NC}"
+echo "Claude API key enables AI-powered daily review reports"
+echo ""
+read -p "Enter Claude API key (or press Enter to skip): " CLAUDE_API_KEY
+
 # Create config file
 if command -v jq &>/dev/null; then
   # Use jq for proper JSON formatting
-  jq -n \
-    --arg key "$API_KEY" \
-    --arg url "$API_URL" \
-    '{ownit: {apiKey: $key, apiUrl: $url}}' > "$CONFIG_FILE"
+  if [ -n "$CLAUDE_API_KEY" ]; then
+    jq -n \
+      --arg key "$API_KEY" \
+      --arg url "$API_URL" \
+      --arg claude "$CLAUDE_API_KEY" \
+      '{api_key: $key, api_url: $url, claude_api_key: $claude}' > "$CONFIG_FILE"
+  else
+    jq -n \
+      --arg key "$API_KEY" \
+      --arg url "$API_URL" \
+      '{api_key: $key, api_url: $url}' > "$CONFIG_FILE"
+  fi
 else
   # Fallback to manual JSON creation
-  cat > "$CONFIG_FILE" << EOF
+  if [ -n "$CLAUDE_API_KEY" ]; then
+    cat > "$CONFIG_FILE" << EOF
 {
-  "ownit": {
-    "apiKey": "$API_KEY",
-    "apiUrl": "$API_URL"
-  }
+  "api_key": "$API_KEY",
+  "api_url": "$API_URL",
+  "claude_api_key": "$CLAUDE_API_KEY"
 }
 EOF
+  else
+    cat > "$CONFIG_FILE" << EOF
+{
+  "api_key": "$API_KEY",
+  "api_url": "$API_URL"
+}
+EOF
+  fi
 fi
 
 # Set file permissions (owner read/write only)

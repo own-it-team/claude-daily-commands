@@ -180,14 +180,104 @@ echo ""
 echo "**${COMMIT_COUNT}개 커밋 | ${FILE_COUNT}개 파일 | +${ADDITIONS}줄 -${DELETIONS}줄**"
 echo ""
 
+# ============================================
+# AI Report Generation (Claude API)
+# ============================================
+AI_REPORT=""
+CLAUDE_API_KEY=""
+
+if [ -f "$CONFIG_FILE" ] && command -v jq &>/dev/null; then
+  CLAUDE_API_KEY=$(jq -r '.claude_api_key // ""' "$CONFIG_FILE" 2>/dev/null || echo "")
+fi
+
+if [ -n "$CLAUDE_API_KEY" ]; then
+  echo -e "${CYAN}🤖 AI 리포트 생성 중...${NC}"
+
+  # Create prompt for Claude
+  PROMPT="You are a technical development analyst. Analyze the following git commit data and provide a concise, insightful daily review report.
+
+Git Commit Data:
+- Date: $DATE
+- Commits: $COMMIT_COUNT
+- Files changed: $FILE_COUNT
+- Lines: +$ADDITIONS -$DELETIONS
+- Main areas: $MAIN_AREAS
+
+Detailed commits:
+$GIT_LOG
+
+Please provide:
+1. Summary (2-3 sentences): Overall development focus
+2. Key Achievements: Main accomplishments today
+3. Technical Highlights: Notable patterns, refactorings, or improvements
+4. Recommendations: Suggestions for next steps
+
+Keep the report concise (under 300 words) and actionable."
+
+  # Call Claude API
+  CLAUDE_RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
+    -H "content-type: application/json" \
+    -H "x-api-key: $CLAUDE_API_KEY" \
+    -H "anthropic-version: 2023-06-01" \
+    -d "{
+      \"model\": \"claude-3-5-sonnet-20241022\",
+      \"max_tokens\": 1024,
+      \"messages\": [{
+        \"role\": \"user\",
+        \"content\": $(echo "$PROMPT" | python3 -c "import sys, json; print(json.dumps(sys.stdin.read()))")
+      }]
+    }" 2>/dev/null)
+
+  # Extract AI report from response
+  if [ -n "$CLAUDE_RESPONSE" ]; then
+    AI_REPORT=$(echo "$CLAUDE_RESPONSE" | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    if 'content' in data and len(data['content']) > 0:
+        print(data['content'][0]['text'])
+    else:
+        print('')
+except:
+    print('')
+" 2>/dev/null || echo "")
+
+    if [ -n "$AI_REPORT" ]; then
+      echo -e "${GREEN}✅ AI 리포트 생성 완료${NC}"
+      echo ""
+    else
+      echo -e "${YELLOW}⚠️  AI 리포트 생성 실패 (응답 파싱 오류)${NC}"
+      echo ""
+    fi
+  else
+    echo -e "${YELLOW}⚠️  AI 리포트 생성 실패 (API 호출 오류)${NC}"
+    echo ""
+  fi
+else
+  echo -e "${YELLOW}💡 AI 리포트를 생성하려면 Claude API 키를 설정하세요${NC}"
+  echo "   설정 방법: ~/.claude-daily-commands/config.json에 'claude_api_key' 추가"
+  echo ""
+fi
+
+# Add AI report to JSON data
+if [ -n "$AI_REPORT" ]; then
+  JSON_DATA=$(echo "$JSON_DATA" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+ai_report = '''$AI_REPORT'''
+data['aiReport'] = ai_report
+print(json.dumps(data))
+")
+fi
+
 # Determine sync mode (authenticated vs anonymous)
 MODE="anonymous"
 API_KEY=""
 API_URL="http://localhost:4000"
 
 if [ -f "$CONFIG_FILE" ] && command -v jq &>/dev/null; then
-  API_KEY=$(jq -r '.api_key // ""' "$CONFIG_FILE" 2>/dev/null || echo "")
-  CUSTOM_API_URL=$(jq -r '.api_url // ""' "$CONFIG_FILE" 2>/dev/null || echo "")
+  API_KEY=$(jq -r '.ownit_api_key // ""' "$CONFIG_FILE" 2>/dev/null || echo "")
+  CUSTOM_API_URL=$(jq -r '.ownit_api_url // ""' "$CONFIG_FILE" 2>/dev/null || echo "")
 
   if [ -n "$CUSTOM_API_URL" ]; then
     API_URL="$CUSTOM_API_URL"
