@@ -96,28 +96,28 @@ if command -v jq &>/dev/null; then
       --arg key "$API_KEY" \
       --arg url "$API_URL" \
       --arg claude "$CLAUDE_API_KEY" \
-      '{api_key: $key, api_url: $url, claude_api_key: $claude}' > "$CONFIG_FILE"
+      '{ownit_api_key: $key, ownit_api_url: $url, claude_api_key: $claude}' > "$CONFIG_FILE"
   else
     jq -n \
       --arg key "$API_KEY" \
       --arg url "$API_URL" \
-      '{api_key: $key, api_url: $url}' > "$CONFIG_FILE"
+      '{ownit_api_key: $key, ownit_api_url: $url}' > "$CONFIG_FILE"
   fi
 else
   # Fallback to manual JSON creation
   if [ -n "$CLAUDE_API_KEY" ]; then
     cat > "$CONFIG_FILE" << EOF
 {
-  "api_key": "$API_KEY",
-  "api_url": "$API_URL",
+  "ownit_api_key": "$API_KEY",
+  "ownit_api_url": "$API_URL",
   "claude_api_key": "$CLAUDE_API_KEY"
 }
 EOF
   else
     cat > "$CONFIG_FILE" << EOF
 {
-  "api_key": "$API_KEY",
-  "api_url": "$API_URL"
+  "ownit_api_key": "$API_KEY",
+  "ownit_api_url": "$API_URL"
 }
 EOF
   fi
