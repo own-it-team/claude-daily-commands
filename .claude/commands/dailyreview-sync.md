@@ -38,20 +38,23 @@ Git 저장소가 아니면:
 
 ### 3단계: 스크립트 경로 확인
 다음 경로들을 순서대로 확인:
-1. `$HOME/development/claude-daily-commands/scripts/sync-daily-review.sh`
-2. `$HOME/claude-daily-commands/scripts/sync-daily-review.sh`
+1. `$HOME/.claude-daily-commands/scripts/sync-daily-review.sh` (설치 스크립트 사용 시)
+2. `$HOME/development/claude-daily-commands/scripts/sync-daily-review.sh` (git clone 시)
+3. `$HOME/claude-daily-commands/scripts/sync-daily-review.sh` (git clone 시)
 
-둘 다 없으면:
+셋 다 없으면:
 ```
 ❌ sync-daily-review.sh 스크립트를 찾을 수 없습니다
 
 설치 방법:
-1. cd ~
-2. git clone https://github.com/wineny/claude-daily-commands.git
+curl -fsSL https://raw.githubusercontent.com/wineny/claude-daily-commands/main/install.sh | bash
+
+또는:
+cd ~
+git clone https://github.com/wineny/claude-daily-commands.git
 
 API 키 설정:
-cd ~/claude-daily-commands
-./scripts/setup-ownit.sh
+~/.claude-daily-commands/scripts/setup-ownit.sh
 ```
 
 ### 4단계: 동기화 실행
@@ -101,8 +104,7 @@ bash ~/development/claude-daily-commands/scripts/sync-daily-review.sh
 ⚠️ API 키가 설정되지 않았습니다
 
 설정 방법:
-cd ~/development/claude-daily-commands
-./scripts/setup-ownit.sh
+~/.claude-daily-commands/scripts/setup-ownit.sh
 
 이후 다시 시도:
 /dailyreview-sync
