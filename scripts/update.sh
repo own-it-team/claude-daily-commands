@@ -83,9 +83,11 @@ echo "🔄 Updating..."
 # Pull latest changes
 git pull origin main
 
-# Reinstall commands
-echo "📝 Reinstalling commands..."
+# Reinstall commands and scripts
+echo "📝 Reinstalling commands and scripts..."
 cp -f .claude/commands/* ~/.claude/commands/
+mkdir -p ~/.claude-daily-commands/scripts
+cp -f scripts/*.sh ~/.claude-daily-commands/scripts/
 
 echo ""
 echo -e "${GREEN}✅ Update complete!${NC}"
