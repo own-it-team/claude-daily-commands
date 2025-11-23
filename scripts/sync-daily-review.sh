@@ -194,25 +194,26 @@ if [ -n "$CLAUDE_API_KEY" ]; then
   echo -e "${CYAN}🤖 AI 리포트 생성 중...${NC}"
 
   # Create prompt for Claude
-  PROMPT="You are a technical development analyst. Analyze the following git commit data and provide a concise, insightful daily review report.
+  PROMPT="당신은 기술 개발 분석가입니다. 다음 Git 커밋 데이터를 분석하여 간결하고 통찰력 있는 일일 리뷰 리포트를 한국어로 작성해주세요.
 
-Git Commit Data:
-- Date: $DATE
-- Commits: $COMMIT_COUNT
-- Files changed: $FILE_COUNT
-- Lines: +$ADDITIONS -$DELETIONS
-- Main areas: $MAIN_AREAS
+Git 커밋 데이터:
+- 날짜: $DATE
+- 커밋 수: $COMMIT_COUNT
+- 변경된 파일: $FILE_COUNT개
+- 라인 변경: +$ADDITIONS -$DELETIONS
+- 주요 작업 영역: $MAIN_AREAS
 
-Detailed commits:
+상세 커밋 내역:
 $GIT_LOG
 
-Please provide:
-1. Summary (2-3 sentences): Overall development focus
-2. Key Achievements: Main accomplishments today
-3. Technical Highlights: Notable patterns, refactorings, or improvements
-4. Recommendations: Suggestions for next steps
+다음 내용을 포함해주세요:
+1. 요약 (2-3문장): 전반적인 개발 방향과 목표
+2. 주요 성과: 오늘 완료한 핵심 작업들
+3. 기술적 하이라이트: 주목할 만한 패턴, 리팩토링, 개선사항
+4. 권장사항: 다음 단계를 위한 제안
 
-Keep the report concise (under 300 words) and actionable."
+리포트는 간결하게 (300단어 이하) 작성하되 실행 가능한 내용으로 구성해주세요.
+마크다운 형식으로 작성하고, 제목은 '# 📊 일일 개발 리뷰'로 시작해주세요."
 
   # Call Claude API
   CLAUDE_RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
@@ -220,7 +221,7 @@ Keep the report concise (under 300 words) and actionable."
     -H "x-api-key: $CLAUDE_API_KEY" \
     -H "anthropic-version: 2023-06-01" \
     -d "{
-      \"model\": \"claude-3-5-sonnet-20241022\",
+      \"model\": \"claude-haiku-4-5-20251001\",
       \"max_tokens\": 1024,
       \"messages\": [{
         \"role\": \"user\",
@@ -292,12 +293,15 @@ else
 fi
 
 # Add AI report and token usage to JSON data
+echo "[DEBUG] Before adding AI report - AI_REPORT length: ${#AI_REPORT}" >&2
 if [ -n "$AI_REPORT" ]; then
-  JSON_DATA=$(echo "$JSON_DATA" | python3 -c "
-import sys, json
+  echo "[DEBUG] AI_REPORT is NOT empty, adding to JSON..." >&2
+  JSON_DATA=$(echo "$JSON_DATA" | AI_REPORT="$AI_REPORT" python3 -c "
+import sys, json, os
 data = json.load(sys.stdin)
-ai_report = '''$AI_REPORT'''
+ai_report = os.environ.get('AI_REPORT', '')
 data['aiReport'] = ai_report
+print(f'[DEBUG-PYTHON] ai_report length: {len(ai_report)}', file=sys.stderr)
 
 # Add token usage information
 data['tokenUsage'] = {
@@ -323,6 +327,8 @@ data['cost'] = {
 
 print(json.dumps(data))
 ")
+else
+  echo "[DEBUG] AI_REPORT is EMPTY, skipping aiReport field" >&2
 fi
 
 # ============================================
@@ -532,8 +538,9 @@ if [ "$NO_SYNC" = false ]; then
         REVIEW_ID=$(echo "$BODY" | python3 -c "import sys, json; print(json.load(sys.stdin)['data']['id'])" 2>/dev/null || echo "")
         echo -e "${GREEN}✅ Own It 동기화 완료!${NC}"
         if [ -n "$REVIEW_ID" ]; then
-          REVIEW_URL="${API_URL}/dashboard/reviews/${REVIEW_ID}"
-          echo "📊 대시보드: ${REVIEW_URL}"
+          WEB_URL=$(echo "$API_URL" | sed 's/:4000/:3000/')
+          REVIEW_URL="${WEB_URL}/daily/${REVIEW_ID}"
+          echo "📊 리뷰 확인: ${REVIEW_URL}"
         fi
         echo ""
         SYNC_SUCCESS=true
