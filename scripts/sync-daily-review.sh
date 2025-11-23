@@ -228,22 +228,54 @@ Keep the report concise (under 300 words) and actionable."
       }]
     }" 2>/dev/null)
 
-  # Extract AI report from response
+  # Extract AI report and token usage from response
+  TOKENS_INPUT=0
+  TOKENS_OUTPUT=0
+  TOKENS_CACHE_CREATION=0
+  TOKENS_CACHE_READ=0
+
   if [ -n "$CLAUDE_RESPONSE" ]; then
-    AI_REPORT=$(echo "$CLAUDE_RESPONSE" | python3 -c "
+    # Parse response and extract both AI report and token usage
+    PARSED_RESPONSE=$(echo "$CLAUDE_RESPONSE" | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
+    result = {'report': '', 'tokens_input': 0, 'tokens_output': 0, 'tokens_cache_creation': 0, 'tokens_cache_read': 0}
+
+    # Extract AI report text
     if 'content' in data and len(data['content']) > 0:
-        print(data['content'][0]['text'])
-    else:
-        print('')
-except:
-    print('')
-" 2>/dev/null || echo "")
+        result['report'] = data['content'][0]['text']
+
+    # Extract token usage from 'usage' field
+    if 'usage' in data:
+        usage = data['usage']
+        result['tokens_input'] = usage.get('input_tokens', 0)
+        result['tokens_output'] = usage.get('output_tokens', 0)
+
+        # Cache tokens (if available)
+        if 'cache_creation_input_tokens' in usage:
+            result['tokens_cache_creation'] = usage['cache_creation_input_tokens']
+        if 'cache_read_input_tokens' in usage:
+            result['tokens_cache_read'] = usage['cache_read_input_tokens']
+
+    print(json.dumps(result))
+except Exception as e:
+    print(json.dumps({'report': '', 'tokens_input': 0, 'tokens_output': 0, 'tokens_cache_creation': 0, 'tokens_cache_read': 0}))
+" 2>/dev/null || echo '{"report":"","tokens_input":0,"tokens_output":0,"tokens_cache_creation":0,"tokens_cache_read":0}')
+
+    # Extract values from parsed response
+    AI_REPORT=$(echo "$PARSED_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('report', ''))" 2>/dev/null || echo "")
+    TOKENS_INPUT=$(echo "$PARSED_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('tokens_input', 0))" 2>/dev/null || echo "0")
+    TOKENS_OUTPUT=$(echo "$PARSED_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('tokens_output', 0))" 2>/dev/null || echo "0")
+    TOKENS_CACHE_CREATION=$(echo "$PARSED_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('tokens_cache_creation', 0))" 2>/dev/null || echo "0")
+    TOKENS_CACHE_READ=$(echo "$PARSED_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('tokens_cache_read', 0))" 2>/dev/null || echo "0")
 
     if [ -n "$AI_REPORT" ]; then
       echo -e "${GREEN}✅ AI 리포트 생성 완료${NC}"
+      echo -e "${CYAN}📊 토큰 사용: Input=$TOKENS_INPUT, Output=$TOKENS_OUTPUT${NC}"
+      if [ "$TOKENS_CACHE_CREATION" -gt 0 ] || [ "$TOKENS_CACHE_READ" -gt 0 ]; then
+        echo -e "${CYAN}   Cache: Creation=$TOKENS_CACHE_CREATION, Read=$TOKENS_CACHE_READ${NC}"
+      fi
       echo ""
     else
       echo -e "${YELLOW}⚠️  AI 리포트 생성 실패 (응답 파싱 오류)${NC}"
@@ -259,16 +291,202 @@ else
   echo ""
 fi
 
-# Add AI report to JSON data
+# Add AI report and token usage to JSON data
 if [ -n "$AI_REPORT" ]; then
   JSON_DATA=$(echo "$JSON_DATA" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 ai_report = '''$AI_REPORT'''
 data['aiReport'] = ai_report
+
+# Add token usage information
+data['tokenUsage'] = {
+    'input': int($TOKENS_INPUT),
+    'output': int($TOKENS_OUTPUT),
+    'cacheCreation': int($TOKENS_CACHE_CREATION),
+    'cacheRead': int($TOKENS_CACHE_READ),
+    'total': int($TOKENS_INPUT) + int($TOKENS_OUTPUT) + int($TOKENS_CACHE_CREATION) + int($TOKENS_CACHE_READ)
+}
+
+# Calculate cost (Claude 3.5 Sonnet pricing)
+# Input: \$3 per MTok, Output: \$15 per MTok
+# Cache creation: \$3.75 per MTok, Cache read: \$0.30 per MTok
+input_cost = (int($TOKENS_INPUT) / 1_000_000) * 3.0
+output_cost = (int($TOKENS_OUTPUT) / 1_000_000) * 15.0
+cache_creation_cost = (int($TOKENS_CACHE_CREATION) / 1_000_000) * 3.75
+cache_read_cost = (int($TOKENS_CACHE_READ) / 1_000_000) * 0.30
+total_cost = input_cost + output_cost + cache_creation_cost + cache_read_cost
+
+data['cost'] = {
+    'usd': round(total_cost, 4)
+}
+
 print(json.dumps(data))
 ")
 fi
+
+# ============================================
+# Claude Code Token Collection (from session JSONL files)
+# ============================================
+echo -e "${CYAN}🔍 Claude Code 토큰 사용량 수집 중...${NC}"
+
+CLAUDE_TOKENS=$(DATE="$DATE" REPO_PATH="$REPO_PATH" python3 << 'PYTHON_TOKENS'
+import sys
+import json
+import os
+from pathlib import Path
+from datetime import datetime
+from glob import glob
+
+# Get target date and repository path
+target_date = os.environ.get('DATE', datetime.now().strftime('%Y-%m-%d'))
+repo_path = os.environ.get('REPO_PATH', '').strip()
+
+# Normalize repository path for comparison
+if repo_path:
+    repo_path = os.path.abspath(repo_path)
+
+# Initialize token counters
+tokens = {
+    'input': 0,
+    'output': 0,
+    'cache_creation': 0,
+    'cache_read': 0,
+    'total': 0
+}
+
+# Define Claude data directories to search
+claude_dirs = []
+config_dir = os.environ.get('CLAUDE_CONFIG_DIR', '').strip()
+
+if config_dir:
+    # Use environment variable paths
+    for path in config_dir.split(','):
+        path = path.strip()
+        if path and os.path.isdir(path):
+            claude_dirs.append(path)
+else:
+    # Default paths
+    home = str(Path.home())
+    xdg_config = os.environ.get('XDG_CONFIG_HOME', os.path.join(home, '.config'))
+    default_paths = [
+        os.path.join(xdg_config, 'claude'),
+        os.path.join(home, '.claude')
+    ]
+    claude_dirs = [p for p in default_paths if os.path.isdir(p)]
+
+# Search for JSONL files in all Claude directories
+for claude_dir in claude_dirs:
+    projects_dir = os.path.join(claude_dir, 'projects')
+    if not os.path.isdir(projects_dir):
+        continue
+
+    # Find all JSONL session files
+    pattern = os.path.join(projects_dir, '**', '*.jsonl')
+    jsonl_files = glob(pattern, recursive=True)
+
+    for jsonl_path in jsonl_files:
+        try:
+            with open(jsonl_path, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    try:
+                        entry = json.loads(line)
+
+                        # Check if entry has required fields
+                        if 'timestamp' not in entry or 'message' not in entry:
+                            continue
+
+                        # Filter by current repository path (cwd field)
+                        if repo_path:
+                            entry_cwd = entry.get('cwd', '').strip()
+                            if entry_cwd:
+                                entry_cwd = os.path.abspath(entry_cwd)
+                                # Check if entry is from current repository
+                                if not entry_cwd.startswith(repo_path):
+                                    continue
+
+                        # Parse timestamp and check if it matches target date
+                        timestamp = entry['timestamp']
+                        entry_date = timestamp.split('T')[0]  # Extract YYYY-MM-DD
+
+                        if entry_date != target_date:
+                            continue
+
+                        # Extract usage from message
+                        message = entry.get('message', {})
+                        usage = message.get('usage', {})
+
+                        if not usage:
+                            continue
+
+                        # Accumulate tokens
+                        tokens['input'] += usage.get('input_tokens', 0)
+                        tokens['output'] += usage.get('output_tokens', 0)
+                        tokens['cache_creation'] += usage.get('cache_creation_input_tokens', 0)
+                        tokens['cache_read'] += usage.get('cache_read_input_tokens', 0)
+
+                    except json.JSONDecodeError:
+                        continue
+        except Exception:
+            continue
+
+# Calculate total
+tokens['total'] = tokens['input'] + tokens['output'] + tokens['cache_creation'] + tokens['cache_read']
+
+# Calculate cost (Claude 3.5 Sonnet pricing)
+input_cost = (tokens['input'] / 1_000_000) * 3.0
+output_cost = (tokens['output'] / 1_000_000) * 15.0
+cache_creation_cost = (tokens['cache_creation'] / 1_000_000) * 3.75
+cache_read_cost = (tokens['cache_read'] / 1_000_000) * 0.30
+total_cost = input_cost + output_cost + cache_creation_cost + cache_read_cost
+
+result = {
+    'tokens': tokens,
+    'cost_usd': round(total_cost, 4)
+}
+
+print(json.dumps(result))
+PYTHON_TOKENS
+)
+
+# Extract Claude Code token data
+CC_TOKENS_INPUT=$(echo "$CLAUDE_TOKENS" | python3 -c "import sys, json; print(json.load(sys.stdin)['tokens']['input'])" 2>/dev/null || echo "0")
+CC_TOKENS_OUTPUT=$(echo "$CLAUDE_TOKENS" | python3 -c "import sys, json; print(json.load(sys.stdin)['tokens']['output'])" 2>/dev/null || echo "0")
+CC_TOKENS_CACHE_CREATION=$(echo "$CLAUDE_TOKENS" | python3 -c "import sys, json; print(json.load(sys.stdin)['tokens']['cache_creation'])" 2>/dev/null || echo "0")
+CC_TOKENS_CACHE_READ=$(echo "$CLAUDE_TOKENS" | python3 -c "import sys, json; print(json.load(sys.stdin)['tokens']['cache_read'])" 2>/dev/null || echo "0")
+CC_TOKENS_TOTAL=$(echo "$CLAUDE_TOKENS" | python3 -c "import sys, json; print(json.load(sys.stdin)['tokens']['total'])" 2>/dev/null || echo "0")
+CC_COST_USD=$(echo "$CLAUDE_TOKENS" | python3 -c "import sys, json; print(json.load(sys.stdin)['cost_usd'])" 2>/dev/null || echo "0.0000")
+
+if [ "$CC_TOKENS_TOTAL" -gt "0" ]; then
+  echo -e "${GREEN}✅ Claude Code 토큰: ${CC_TOKENS_TOTAL} (비용: \$${CC_COST_USD})${NC}"
+  echo "   Input: ${CC_TOKENS_INPUT} | Output: ${CC_TOKENS_OUTPUT}"
+  echo "   Cache Creation: ${CC_TOKENS_CACHE_CREATION} | Cache Read: ${CC_TOKENS_CACHE_READ}"
+else
+  echo -e "${YELLOW}⚠️  Claude Code 토큰 사용 내역 없음${NC}"
+fi
+echo ""
+
+# Add Claude Code usage to JSON data
+JSON_DATA=$(echo "$JSON_DATA" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+
+# Add Claude Code token usage
+data['claudeCodeUsage'] = {
+    'input': int($CC_TOKENS_INPUT),
+    'output': int($CC_TOKENS_OUTPUT),
+    'cacheCreation': int($CC_TOKENS_CACHE_CREATION),
+    'cacheRead': int($CC_TOKENS_CACHE_READ),
+    'total': int($CC_TOKENS_TOTAL),
+    'costUsd': float($CC_COST_USD)
+}
+
+print(json.dumps(data))
+")
 
 # Determine sync mode (authenticated vs anonymous)
 MODE="anonymous"
