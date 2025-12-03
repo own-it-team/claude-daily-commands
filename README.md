@@ -7,13 +7,27 @@
 
 ---
 
-## 🚀 One-Click Install
+## 🚀 Quick Start
 
+### 설치
 ```bash
 curl -fsSL https://raw.githubusercontent.com/wineny/claude-daily-commands/main/install.sh | bash
 ```
 
 **Then restart Claude Code (Cmd+Q) and you're ready to go!**
+
+### 업데이트
+```bash
+# 자동 업데이트 강제 실행
+rm -f ~/.claude-daily-commands/.last-update-check
+/dailyreview-sync
+
+# 또는 수동 다운로드
+curl -sL https://raw.githubusercontent.com/wineny/claude-daily-commands/main/.claude/commands/dailyreview-sync.md \
+  -o ~/.claude/commands/dailyreview-sync.md
+```
+
+📖 **상세 업데이트 가이드**: [UPDATE.md](UPDATE.md)
 
 ---
 
