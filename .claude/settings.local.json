@@ -43,7 +43,13 @@
       "Bash(./scripts/sync-daily-review.sh:*)",
       "Bash(./scripts/update.sh:*)",
       "Bash(bash:*)",
-      "Bash(git rev-parse:*)"
+      "Bash(git rev-parse:*)",
+      "Bash(git commit:*)",
+      "Bash(pnpm db:push:*)",
+      "Bash(test:*)",
+      "Bash(for i in {6..0})",
+      "Bash(do date -v-$id +%Y-%m-%d)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

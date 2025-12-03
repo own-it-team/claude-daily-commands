@@ -151,11 +151,28 @@ done
 **week 모드에서도 각 날짜별로 프롬프트 인사이트를 수집합니다** (세션 로그의 timestamp 기준으로 필터링)
 
 ### 3단계: Git 데이터 수집
+
+**사용자 정보 확인 (필수):**
+```bash
+# 현재 Git 사용자 정보 가져오기
+GIT_USER_NAME=$(git config user.name)
+GIT_USER_EMAIL=$(git config user.email)
+
+# 사용자가 설정되지 않은 경우 경고
+if [ -z "$GIT_USER_NAME" ]; then
+  echo "⚠️ Git 사용자 이름이 설정되지 않았습니다"
+  echo "💡 git config --global user.name '이름' 으로 설정하세요"
+  exit 1
+fi
+```
+
 **단일 날짜 모드 (today/yesterday/특정날짜):**
 ```bash
 # TARGET_DATE는 처리할 날짜 (예: 2025-12-01)
 NEXT_DATE=$(date -j -f "%Y-%m-%d" "$TARGET_DATE" -v+1d +%Y-%m-%d)
-git log --since="$TARGET_DATE 00:00" --until="$NEXT_DATE 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
+
+# 본인의 커밋만 필터링 (--author)
+git log --author="$GIT_USER_EMAIL" --since="$TARGET_DATE 00:00" --until="$NEXT_DATE 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
 ```
 
 추가 정보 수집:
