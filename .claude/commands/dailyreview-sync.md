@@ -214,88 +214,34 @@ git config --get remote.origin.url  # 원격 저장소 URL
 ### 4.5단계: 프롬프트 인사이트 수집 ⚠️ CRITICAL - 반드시 실행
 **MUST**: 이 단계는 반드시 실행해야 합니다. 건너뛰지 마세요.
 
-해당 날짜에 사용한 프롬프트 중 인사이트 있는 3개를 선별합니다.
+해당 날짜에 사용한 프롬프트와 실제 토큰 사용량을 수집합니다.
 
-1. **프롬프트 추출** (Bash 실행)
-   현재 프로젝트의 해당 날짜 세션 로그에서 사용자 프롬프트 수집.
-   **중요**: 파일 기반 처리로 안정적으로 실행합니다.
+**실행 명령어:**
+```bash
+export REPO_PATH=$(git rev-parse --show-toplevel)
+export TARGET_DATE="YYYY-MM-DD"  # 처리할 날짜로 대체 (예: 2025-12-09)
 
-   ```bash
-   export REPO_PATH=$(git rev-parse --show-toplevel)
-   export TARGET_DATE="YYYY-MM-DD"  # 처리할 날짜로 대체 (예: 2025-12-01)
+# Claude Code 세션 로그를 임시 파일로 수집
+TEMP_FILE="/tmp/claude_prompts_$$.jsonl"
+find ~/.claude/projects -name "*.jsonl" -type f 2>/dev/null -exec cat {} \; > "$TEMP_FILE" 2>/dev/null
 
-   # JSONL 파일들을 임시 파일로 합침
-   find ~/.claude/projects -name "*.jsonl" -type f 2>/dev/null -exec cat {} \; > /tmp/claude_prompts_$$.jsonl 2>/dev/null
+# scripts/collect-prompts-and-tokens.py 스크립트 경로 찾기
+SCRIPT_DIR="$(dirname "$(find ~/.claude/commands -name dailyreview-sync.md -type f 2>/dev/null | head -1)")/../../../scripts"
+if [ -f "$SCRIPT_DIR/collect-prompts-and-tokens.py" ]; then
+    python3 "$SCRIPT_DIR/collect-prompts-and-tokens.py" "$TEMP_FILE"
+else
+    echo "⚠️ collect-prompts-and-tokens.py 스크립트를 찾을 수 없습니다" >&2
+fi
 
-   python3 << 'PYEOF'
-import json
-import re
-import os
+# 임시 파일 삭제
+rm -f "$TEMP_FILE"
+```
 
-repo_path = os.environ.get('REPO_PATH', '')
-target_date = os.environ.get('TARGET_DATE', '')
-pid = os.getppid()
+**출력 형식:**
+- `---PROMPT---` 마커 뒤에 수집된 프롬프트 (최대 30개, 각 1000자 제한)
+- `---TOKEN_USAGE---` 마커 뒤에 실제 토큰 사용량 JSON
 
-sensitive_patterns = [
-    (r'sk-[a-zA-Z0-9_-]{20,}', '***API_KEY***'),
-    (r'password[\"\']?\s*[:=]\s*[\"\']?[^\"\s]+', 'password: ***'),
-    (r'api[_-]?key[\"\']?\s*[:=]\s*[\"\']?[^\"\s]+', 'api_key: ***'),
-    (r'Bearer\s+[a-zA-Z0-9._-]+', 'Bearer ***'),
-]
-
-def mask_sensitive(text):
-    for pattern, replacement in sensitive_patterns:
-        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
-    return text
-
-def extract_text(content):
-    """content가 문자열이면 그대로, 리스트면 text 타입만 추출"""
-    if isinstance(content, str):
-        return content
-    elif isinstance(content, list):
-        texts = []
-        for item in content:
-            if isinstance(item, dict) and item.get('type') == 'text':
-                texts.append(item.get('text', ''))
-        return ' '.join(texts)
-    return ''
-
-prompts = []
-try:
-    with open(f'/tmp/claude_prompts_{pid}.jsonl', 'r') as f:
-        for line in f:
-            try:
-                d = json.loads(line)
-                if d.get('type') != 'user':
-                    continue
-                cwd = d.get('cwd') or ''
-                if not repo_path or not cwd.startswith(repo_path):
-                    continue
-                ts = (d.get('timestamp') or '')[:10]
-                if ts != target_date:
-                    continue
-                msg = d.get('message') or {}
-                content = msg.get('content', '')
-                text = extract_text(content)
-                if len(text) > 50 and text.strip() not in ['응', 'ㅇㅇ', '확인', 'ok', 'yes', 'no']:
-                    prompts.append(mask_sensitive(text))
-            except json.JSONDecodeError:
-                continue
-            except Exception:
-                continue
-except FileNotFoundError:
-    pass
-
-for p in prompts[-30:]:
-    print('---PROMPT---')
-    print(p[:1000])
-PYEOF
-
-   # 임시 파일 삭제
-   rm -f /tmp/claude_prompts_$$.jsonl
-   ```
-
-2. **인사이트 분석 기준**
+**인사이트 분석 기준**
    수집된 프롬프트를 다음 기준으로 평가:
    - **도구 조합**: MCP 서버 여러 개 사용, 파일 경로 참조
    - **구체성**: 명확한 목표와 컨텍스트 제공
@@ -322,6 +268,18 @@ PYEOF
    ```
 
 ### 5단계: JSON 데이터 구성
+
+**⚠️ MUST: 다음 필드들은 반드시 생성해야 합니다:**
+- `promptInsights`: **최소 1개 이상 필수**. 프롬프트가 단순하거나 적어도 반드시 분석하여 인사이트 생성
+  - 프롬프트가 없거나 너무 짧으면: `[{"title": "프롬프트 인사이트 없음", "originalPrompt": "수집된 프롬프트가 없거나 분석 불가", "whyGood": ["다음에는 더 구체적인 프롬프트 작성 권장"]}]`
+- `tokenUsage`: **반드시 포함**. 4.5단계에서 수집한 실제 토큰 사용량 사용
+  - 형식: `{"inputTokens": 실제값, "outputTokens": 실제값, "cacheCreationTokens": 실제값, "cacheReadTokens": 실제값}`
+  - `---TOKEN_USAGE---` 마커 뒤의 JSON 데이터를 그대로 사용
+  - 토큰 데이터가 없는 경우에만: `{"inputTokens": 0, "outputTokens": 0, "cacheCreationTokens": 0, "cacheReadTokens": 0}`
+- `cost`: **반드시 포함**. tokenUsage 기반 실제 비용 (USD)
+  - 계산: `(inputTokens * 0.003 + outputTokens * 0.015) / 1000`
+  - 캐시 토큰은 비용 계산에서 제외 (무료 또는 할인된 가격)
+
 다음 구조로 JSON 생성:
 ```json
 {
@@ -358,45 +316,35 @@ PYEOF
       "originalPrompt": "사용자가 입력한 프롬프트 원문 그대로 (마스킹 처리됨)",
       "whyGood": ["이유1", "이유2"]
     }
-  ]
+  ],
+  "tokenUsage": {
+    "inputTokens": 5000,
+    "outputTokens": 2500
+  },
+  "cost": 0.0525
 }
 ```
 
 ### 6단계: Own It API 전송
 
-**설정 파일 확인:**
+**설정 파일 읽기:**
 ```bash
-# --local 플래그가 있으면 config.local.json 우선 사용
+# --local 플래그 여부에 따라 config 파일 선택
 if [[ "$ARGUMENTS" == *"--local"* ]] && [ -f ~/.claude-daily-commands/config.local.json ]; then
-  cat ~/.claude-daily-commands/config.local.json 2>/dev/null
+  CONFIG_FILE=~/.claude-daily-commands/config.local.json
 else
-  cat ~/.claude-daily-commands/config.json 2>/dev/null
+  CONFIG_FILE=~/.claude-daily-commands/config.json
 fi
+
+# API 키와 URL 읽기
+API_KEY=$(jq -r '.ownit_api_key' "$CONFIG_FILE" 2>/dev/null)
+API_URL=$(jq -r '.ownit_api_url' "$CONFIG_FILE" 2>/dev/null)
+
+# 기본 URL 설정
+[ -z "$API_URL" ] && API_URL="https://api.own-it.dev"
 ```
 
-**API URL 및 키 결정 로직:**
-1. `--local` 플래그 있음:
-   - `~/.claude-daily-commands/config.local.json` 존재 → 해당 파일에서 API 키와 URL 읽기
-   - `config.local.json` 없음 → `config.json`에서 API 키 읽고 URL은 `http://localhost:4000`로 오버라이드
-2. `--local` 플래그 없음:
-   - `config.json`에서 API 키와 URL 읽기
-   - URL이 없으면 기본값 `https://api.own-it.dev`
-
-**config.json 예시** (운영 서버용):
-```json
-{
-  "ownit_api_key": "own_it_sk_xxx",
-  "ownit_api_url": "https://api.own-it.dev"
-}
-```
-
-**config.local.json 예시** (로컬 개발용):
-```json
-{
-  "ownit_api_key": "own_it_sk_xxx",
-  "ownit_api_url": "http://localhost:4000"
-}
-```
+> 💡 **설정 파일 형식 및 환경별 사용법**은 하단 [설정 파일](#설정-파일) 섹션 참조
 
 **인증 모드** (API 키가 있는 경우):
 ```bash
@@ -481,31 +429,27 @@ curl -s -X POST "[API_URL]/anonymous-reviews" \
 
 ## 설정 파일
 
-### 운영 서버용 설정
-`~/.claude-daily-commands/config.json`:
+**위치 및 우선순위:**
+- `~/.claude-daily-commands/config.json` - 운영 서버용 (기본)
+- `~/.claude-daily-commands/config.local.json` - 로컬 개발용 (`--local` 플래그 사용 시 우선)
+
+**형식:**
 ```json
 {
   "ownit_api_key": "own_it_sk_xxx",
-  "ownit_api_url": "https://api.own-it.dev"
+  "ownit_api_url": "https://api.own-it.dev"  // 또는 "http://localhost:4000"
 }
 ```
 
-### 로컬 개발용 설정 (선택사항)
-`~/.claude-daily-commands/config.local.json`:
-```json
-{
-  "ownit_api_key": "own_it_sk_xxx",
-  "ownit_api_url": "http://localhost:4000"
-}
+**필드:**
+- `ownit_api_key` - Own It API 키 (없으면 익명 모드로 동작)
+- `ownit_api_url` - API 서버 URL (기본값: `https://api.own-it.dev`)
+
+**사용 예시:**
+```bash
+/dailyreview-sync           # config.json 사용 (운영 서버)
+/dailyreview-sync --local   # config.local.json 우선 (로컬 서버)
 ```
-
-**필드 설명:**
-- `ownit_api_key`: Own It API 키 (없으면 익명 모드)
-- `ownit_api_url`: API 서버 URL (기본값: `https://api.own-it.dev`)
-
-**환경별 사용:**
-- **일반 사용**: `config.json`에서 운영 서버로 자동 동기화
-- **로컬 개발**: `--local` 플래그 사용 시 `config.local.json`이 있으면 우선 사용, 없으면 `config.json`의 키로 localhost:4000에 연결
 
 ---
 
