@@ -97,15 +97,17 @@ Git 저장소가 아니면:
 
 **단일 날짜 Git 명령어:**
 ```bash
-# 오늘
-git log --since="today 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
+# 오늘 (모든 브랜치 포함)
+git log --all --since="today 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
 
 # 어제
-git log --since="yesterday 00:00" --until="today 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
+git log --all --since="yesterday 00:00" --until="today 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
 
 # 특정 날짜 (YYYY-MM-DD)
-git log --since="2025-01-15 00:00" --until="2025-01-16 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
+git log --all --since="2025-01-15 00:00" --until="2025-01-16 00:00" --pretty=format:'%H|%ai|%s|%an' --numstat --no-merges
 ```
+
+> ⚠️ `--all` 플래그: feature 브랜치 커밋도 포함 (머지 전 작업도 수집)
 
 ### 2.5단계: Week 모드 - 7일 순차 처리
 **"week" 인자인 경우에만 실행**
